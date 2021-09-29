@@ -173,6 +173,7 @@ function parseSource(tokens) {
       return {
         type: 'SyntaxError',
         message: `予期しないトークン\`${tokens[readPosition]?.type}\`, \`${tokens[readPosition + 1]?.type}\`が渡されました`,
+        hoge: tokens[readPosition],
       }
     }
   }

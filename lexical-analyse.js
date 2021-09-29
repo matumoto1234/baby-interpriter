@@ -19,6 +19,64 @@ function countDigits(source) {
   return readPosition
 }
 
+function countChars(source) {
+  let readPosition = 0
+  while (readPosition < source.length) {
+    if (source[readPosition] === '"') {
+      return readPosition
+    }
+    if (source[readPosition] === '\\') {
+      readPosition += 1
+    }
+    readPosition += 1
+  }
+  return readPosition
+}
+
+function escapedString(string) {
+  let res = ''
+  for (let i = 0; i < string.length; i += 1) {
+    if (string[i] !== '\\') {
+      res += string[i]
+      // eslint-disable-next-line no-continue
+      continue
+    }
+    switch (string[i + 1]) {
+      case 'n':
+        res += '\n'
+        break
+      case 'b':
+        res += '\b'
+        break
+      case 't':
+        res += '\t'
+        break
+      case 'v':
+        res += '\v'
+        break
+      case 'r':
+        res += '\r'
+        break
+      case '\\':
+        res += '\\\\'
+        break
+      case '"':
+        res += '"'
+        break
+      case '\'':
+        res += '\''
+        break
+      case '\0':
+        res += '\0'
+        break
+      default:
+        break
+    }
+    i += 1
+  }
+  return res
+}
+
 function countIdentChars(source) {
   let readPosition = 0
   while (readPosition < source.length) {
@@ -59,12 +117,32 @@ module.exports.lexicalAnalyse = function (source) {
         tokens.push({ type: 'Semicolon' })
         readPosition += 1
         break
+      case '#':
+        for (let i = readPosition; i < source.length; i += 1, readPosition += 1) {
+          if (source[i] === '\n') {
+            break
+          }
+        }
+        break
+      case '"':
+        // eslint-disable-next-line no-case-declarations
+        const cntChar = countChars(source.substring(readPosition + 1))
+        tokens.push({
+          type: 'StringLiteral',
+          value: escapedString(source.substring(
+            readPosition + 1,
+            readPosition + cntChar + 1,
+          )),
+        })
+        readPosition += cntChar + 2
+        break
       case ' ':
       case '\t':
       case '\n':
         readPosition += 1
         break
       default:
+
         if (isDigit(source[readPosition])) {
           const digitsCount = countDigits(source.substring(readPosition))
           tokens.push({
