@@ -9,6 +9,21 @@ function parseLiteral(tokens) {
         },
         parsedTokensCount: 1,
       }
+    case 'Bool':
+      return {
+        expression: {
+          type: 'BoolLiteral',
+          value: head.value,
+        },
+        parsedTokensCount: 1,
+      }
+    case 'Null':
+      return {
+        expression: {
+          type: 'NullLiteral',
+        },
+        parsedTokensCount: 1,
+      }
     default:
       return {
         expression: null,
@@ -41,22 +56,16 @@ function parseParenthesisExpression(tokens) {
   return parseValue(tokens)
 }
 
-function parseFunctionCallArguments(tokens) {
+function parseCommaSeparatedExpressions(tokens) {
   const {
     expression: firstExpression,
     parsedTokensCount: firstParsedTokensCount,
   // eslint-disable-next-line no-use-before-define
   } = parseExpression(tokens)
-  if (firstExpression === null && tokens[0]?.type === 'RParen') {
+  if (firstExpression === null) {
     return {
       args: [],
       parsedTokensCount: 0,
-    }
-  }
-  if (tokens[firstParsedTokensCount]?.type === 'RParen') {
-    return {
-      args: [firstExpression],
-      parsedTokensCount: firstParsedTokensCount,
     }
   }
   const args = [firstExpression]
@@ -66,18 +75,15 @@ function parseFunctionCallArguments(tokens) {
     // eslint-disable-next-line no-use-before-define
     const { expression, parsedTokensCount } = parseExpression(tokens.slice(readPosition))
     if (expression === null) {
-      break
+      return null
     }
     args.push(expression)
     readPosition += parsedTokensCount
-    if (tokens[readPosition]?.type === 'RParen') {
-      return {
-        args,
-        parsedTokensCount: readPosition,
-      }
-    }
   }
-  return null
+  return {
+    args,
+    parsedTokensCount: readPosition,
+  }
 }
 
 function parseFunctionCallExpression(tokens) {
@@ -85,11 +91,14 @@ function parseFunctionCallExpression(tokens) {
   if (name?.type !== 'Ident' || tokens[1]?.type !== 'LParen') {
     return parseParenthesisExpression(tokens)
   }
-  const argsAndParsedTokensCount = parseFunctionCallArguments(tokens.slice(2))
+  const argsAndParsedTokensCount = parseCommaSeparatedExpressions(tokens.slice(2))
   if (argsAndParsedTokensCount === null) {
     return parseParenthesisExpression(tokens)
   }
   const { args, parsedTokensCount } = argsAndParsedTokensCount
+  if (tokens[parsedTokensCount + 2]?.type !== 'RParen') {
+    return parseParenthesisExpression(tokens)
+  }
   return {
     expression: {
       type: 'FuncCall',
@@ -120,13 +129,70 @@ function parseExpression(tokens) {
   return parseAddSubExpression(tokens)
 }
 
+function parseBlock(tokens) {
+  if (tokens[0]?.type !== 'LBrace') {
+    return { statements: null }
+  }
+  const statements = []
+  let readPosition = 1
+  while (tokens[readPosition]?.type !== 'RBrace') {
+    if (tokens[readPosition] === undefined) {
+      return { statements: null }
+    }
+    const {
+      statement: stmt,
+      parsedTokensCount,
+    // eslint-disable-next-line no-use-before-define
+    } = parseStatement(tokens.slice(readPosition))
+    if (stmt === null) {
+      return { statements: null }
+    }
+    statements.push(stmt)
+    readPosition += parsedTokensCount
+  }
+  return {
+    statements,
+    parsedTokensCount: readPosition + 2,
+  }
+}
+
+function parseIfStatement(tokens) {
+  if (tokens[0]?.type !== 'If' || tokens[1]?.type !== 'LParen') {
+    return { ifStatement: null }
+  }
+  const {
+    expression: condition,
+    parsedTokensCount: parsedExpressionTokensCount,
+  } = parseExpression(tokens.slice(2))
+  if (
+    !condition
+    || tokens[parsedExpressionTokensCount + 2]?.type !== 'RParen') {
+    return { ifStatement: null }
+  }
+  const {
+    statements,
+    parsedTokensCount: parsedBlockTokensCount,
+  } = parseBlock(tokens.slice(parsedExpressionTokensCount + 3))
+  if (!statements) {
+    return { ifStatement: null }
+  }
+  return {
+    ifStatement: {
+      type: 'If',
+      condition,
+      statements,
+    },
+    parsedTokensCount: parsedExpressionTokensCount + parsedBlockTokensCount + 3,
+  }
+}
+
 function parseAssignment(tokens) {
   if (tokens[0]?.type !== 'Ident' || tokens[1]?.type !== 'Equal') {
-    return { result: null }
+    return { assignment: null }
   }
   const { expression, parsedTokensCount } = parseExpression(tokens.slice(2))
   if (!expression) {
-    return { result: null }
+    return { assignment: null }
   }
   return {
     assignment: {
@@ -147,13 +213,76 @@ function parseStatement(tokens) {
     }
   }
   const { assignment, parsedTokensCount: parsedAssignmentTokensCount } = parseAssignment(tokens)
-  if (assignment) {
+  if (assignment && tokens[parsedAssignmentTokensCount]?.type === 'Semicolon') {
     return {
       statement: assignment,
       parsedTokensCount: parsedAssignmentTokensCount + 1,
     }
   }
-  return { expression: null }
+  const { ifStatement, parsedTokensCount: parsedIfTokensCount } = parseIfStatement(tokens)
+  if (ifStatement) {
+    return {
+      statement: ifStatement,
+      parsedTokensCount: parsedIfTokensCount,
+    }
+  }
+  return { statement: null }
+}
+
+function parseCommaSeparatedIdentfiers(tokens) {
+  const head = tokens[0]
+  if (head?.type !== 'Ident') {
+    return {
+      names: [],
+      parsedTokensCount: 0,
+    }
+  }
+  const names = [head.value]
+  let readPosition = 1
+  while (tokens[readPosition]?.type === 'Comma') {
+    readPosition += 1
+    // eslint-disable-next-line no-use-before-define
+    const next = tokens[readPosition]
+    if (next.type !== 'Ident') {
+      break
+    }
+    names.push(next.value)
+    readPosition += 1
+  }
+  return {
+    names,
+    parsedTokensCount: readPosition,
+  }
+}
+
+function parseDefineFunction(tokens) {
+  if (tokens[0]?.type !== 'Def' || tokens[1]?.type !== 'Ident' || tokens[2]?.type !== 'LParen') {
+    return { define: null }
+  }
+  const { value: name } = tokens[1]
+  const {
+    names: args,
+    parsedTokensCount: parsedArgumentTokensCount,
+  } = parseCommaSeparatedIdentfiers(tokens.slice(3))
+  if (tokens[parsedArgumentTokensCount + 3]?.type !== 'RParen') {
+    return { define: null }
+  }
+  const {
+    statements,
+    parsedTokensCount: parsedBlockTokensCount,
+  } = parseBlock(tokens.slice(parsedArgumentTokensCount + 4))
+  if (!statements) {
+    return { define: null }
+  }
+  return {
+    defineFunction: {
+      type: 'FuncDef',
+      name,
+      arguments: args,
+      statements,
+    },
+    parsedTokensCount: parsedArgumentTokensCount + parsedBlockTokensCount + 4,
+  }
 }
 
 function parseSource(tokens) {
@@ -164,17 +293,26 @@ function parseSource(tokens) {
       statement: stmt,
       parsedTokensCount: parsedExpressionTokensCount,
     } = parseStatement(tokens.slice(readPosition))
-    if (stmt && stmt?.type !== 'SyntaxError') {
+    if (stmt) {
       statements.push(stmt)
       readPosition += parsedExpressionTokensCount
-    } else if (stmt && stmt?.type === 'SyntaxError') {
-      return stmt
-    } else {
-      return {
-        type: 'SyntaxError',
-        message: `予期しないトークン\`${tokens[readPosition]?.type}\`, \`${tokens[readPosition + 1]?.type}\`が渡されました`,
-        hoge: tokens[readPosition],
-      }
+      // eslint-disable-next-line no-continue
+      continue
+    }
+    const {
+      defineFunction,
+      parsedTokensCount: parsedDefineFunctionTokensCount,
+    } = parseDefineFunction(tokens.slice(readPosition))
+    if (defineFunction) {
+      statements.push(defineFunction)
+      readPosition += parsedDefineFunctionTokensCount
+      // eslint-disable-next-line no-continue
+      continue
+    }
+    return {
+      type: 'SyntaxError',
+      message: `予期しないトークン\`${tokens[readPosition]?.type}\`が渡されました`,
+      headToken: tokens[readPosition],
     }
   }
   return {

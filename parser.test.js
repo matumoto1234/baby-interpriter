@@ -100,6 +100,42 @@ describe('構文解析', () => {
       },
     )
   })
+  describe('各種リテラル', () => {
+    test('整数', () => {
+      expect(parse(lex('123;'))).toStrictEqual(
+        {
+          type: 'Source',
+          statements: [{ type: 'IntLiteral', value: 123 }],
+        },
+      )
+    })
+    describe('真偽値', () => {
+      test('true', () => {
+        expect(parse(lex('true;'))).toStrictEqual(
+          {
+            type: 'Source',
+            statements: [{ type: 'BoolLiteral', value: true }],
+          },
+        )
+      })
+      test('false', () => {
+        expect(parse(lex('false;'))).toStrictEqual(
+          {
+            type: 'Source',
+            statements: [{ type: 'BoolLiteral', value: false }],
+          },
+        )
+      })
+    })
+    test('null', () => {
+      expect(parse(lex('null;'))).toStrictEqual(
+        {
+          type: 'Source',
+          statements: [{ type: 'NullLiteral' }],
+        },
+      )
+    })
+  })
   test('変数', () => {
     expect(parse(lex('abc;'))).toStrictEqual(
       {
@@ -212,23 +248,182 @@ describe('構文解析', () => {
         },
       )
     })
+    test('引数の構文解析に失敗', () => {
+      expect(parse(lex('func(+);')).type).toBe('SyntaxError')
+    })
   })
-  test('代入文', () => {
-    expect(parse(lex('two=1+1;'))).toStrictEqual(
-      {
+  describe('代入文', () => {
+    test('基本の形', () => {
+      expect(parse(lex('two=1+1;'))).toStrictEqual(
+        {
+          type: 'Source',
+          statements: [
+            {
+              type: 'Assignment',
+              name: 'two',
+              expression: {
+                type: 'Add',
+                left: { type: 'IntLiteral', value: 1 },
+                right: { type: 'IntLiteral', value: 1 },
+              },
+            },
+          ],
+        },
+      )
+    })
+    test('セミコロンの確認', () => {
+      expect(parse(lex('two=1+1')).type).toBe('SyntaxError')
+    })
+    test('式の構文解析に失敗', () => {
+      expect(parse(lex('a=;')).type).toBe('SyntaxError')
+    })
+  })
+  describe('if', () => {
+    test('文が0個', () => {
+      expect(parse(lex('if(true) { }'))).toStrictEqual(
+        {
+          type: 'Source',
+          statements: [
+            {
+              type: 'If',
+              condition: { type: 'BoolLiteral', value: true },
+              statements: [],
+            },
+          ],
+        },
+      )
+    })
+    test('文が1個', () => {
+      expect(parse(lex('if(true) { 1; }'))).toStrictEqual(
+        {
+          type: 'Source',
+          statements: [
+            {
+              type: 'If',
+              condition: { type: 'BoolLiteral', value: true },
+              statements: [{ type: 'IntLiteral', value: 1 }],
+            },
+          ],
+        },
+      )
+    })
+    test('文が2個', () => {
+      expect(parse(lex('if(true) { 1; 2; }'))).toStrictEqual(
+        {
+          type: 'Source',
+          statements: [
+            {
+              type: 'If',
+              condition: { type: 'BoolLiteral', value: true },
+              statements: [
+                { type: 'IntLiteral', value: 1 },
+                { type: 'IntLiteral', value: 2 },
+              ],
+            },
+          ],
+        },
+      )
+    })
+    describe('エラー処理', () => {
+      test('丸括弧が閉じず失敗', () => {
+        expect(parse(lex('if(1')).type).toBe('SyntaxError')
+      })
+      test('ブロックの構文解析に失敗', () => {
+        expect(parse(lex('if(true) { 1+1 }')).type).toBe('SyntaxError')
+      })
+      test('ブロックがなくて失敗', () => {
+        expect(parse(lex('if(false)')).type).toBe('SyntaxError')
+      })
+      test('ブロックが閉じず失敗', () => {
+        expect(parse(lex('if(false){')).type).toBe('SyntaxError')
+      })
+    })
+  })
+  describe('関数定義', () => {
+    test('引数が0個、文が0個', () => {
+      expect(parse(lex('def funcname() { }'))).toStrictEqual({
         type: 'Source',
         statements: [
           {
-            type: 'Assignment',
-            name: 'two',
-            expression: {
-              type: 'Add',
-              left: { type: 'IntLiteral', value: 1 },
-              right: { type: 'IntLiteral', value: 1 },
-            },
+            type: 'FuncDef',
+            name: 'funcname',
+            arguments: [],
+            statements: [],
           },
         ],
-      },
-    )
+      })
+    })
+    test('引数が1個、文が0個', () => {
+      expect(parse(lex('def funcname(argument) { }'))).toStrictEqual({
+        type: 'Source',
+        statements: [
+          {
+            type: 'FuncDef',
+            name: 'funcname',
+            arguments: ['argument'],
+            statements: [],
+          },
+        ],
+      })
+    })
+    test('引数が2個、文が0個', () => {
+      expect(parse(lex('def funcname(xxx, yyy) { }'))).toStrictEqual({
+        type: 'Source',
+        statements: [
+          {
+            type: 'FuncDef',
+            name: 'funcname',
+            arguments: ['xxx', 'yyy'],
+            statements: [],
+          },
+        ],
+      })
+    })
+    test('引数が0個、文が1個', () => {
+      expect(parse(lex('def funcname() { 123; }'))).toStrictEqual({
+        type: 'Source',
+        statements: [
+          {
+            type: 'FuncDef',
+            name: 'funcname',
+            arguments: [],
+            statements: [
+              { type: 'IntLiteral', value: 123 },
+            ],
+          },
+        ],
+      })
+    })
+    test('引数が0個、文が2個', () => {
+      expect(parse(lex('def funcname() { 123; 456; }'))).toStrictEqual({
+        type: 'Source',
+        statements: [
+          {
+            type: 'FuncDef',
+            name: 'funcname',
+            arguments: [],
+            statements: [
+              { type: 'IntLiteral', value: 123 },
+              { type: 'IntLiteral', value: 456 },
+            ],
+          },
+        ],
+      })
+    })
+    describe('エラー処理', () => {
+      test('引数に違うトークン', () => {
+        expect(parse(lex('def name(123)')).type).toBe('SyntaxError')
+        expect(parse(lex('def name(abc, 123)')).type).toBe('SyntaxError')
+      })
+      test('引数の括弧が閉じない', () => {
+        expect(parse(lex('def name(')).type).toBe('SyntaxError')
+      })
+      test('ブロックの括弧が閉じない', () => {
+        expect(parse(lex('def name() {')).type).toBe('SyntaxError')
+      })
+      test('ブロックでエラー', () => {
+        expect(parse(lex('def name() { nonsemicolon }')).type).toBe('SyntaxError')
+      })
+    })
   })
 })
