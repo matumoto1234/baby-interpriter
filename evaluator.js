@@ -58,7 +58,7 @@ function evaluateIfStatement(ast, initialEnvironment) {
   return evaluateStatements(statements, halfwayEnvironment)
 }
 
-function evaluateAdd(ast, environment) {
+function evaluateAddSub(ast, environment) {
   const {
     result: leftResult,
     environment: leftEnvironment,
@@ -81,8 +81,51 @@ function evaluateAdd(ast, environment) {
   if (rightResult.type !== 'IntValue') {
     return typeError(rightResult.type)
   }
+
+  if (ast.type === 'Add') {
+    return {
+      result: intValue(leftResult.value + rightResult.value),
+      environment: rightEnvironment,
+    }
+  // eslint-disable-next-line no-else-return
+  } else if (ast.type === 'Sub') {
+    return {
+      result: intValue(leftResult.value - rightResult.value),
+      environment: rightEnvironment,
+    }
+  }
   return {
-    result: intValue(leftResult.value + rightResult.value),
+    result: null,
+    environment: null,
+  }
+}
+
+function evaluateUnaryOperator(ast, environment) {
+  const {
+    result: rightResult,
+    environment: rightEnvironment,
+    // eslint-disable-next-line no-use-before-define
+  } = evaluate(ast.right, environment)
+
+  if (rightResult.type !== 'IntValue') {
+    return {
+      result: {
+        type: 'EvaluatorError',
+        isError: true,
+        message: `無効なast\`${rightResult.type}\`が渡されました`,
+      },
+      environment,
+    }
+  }
+
+  if (ast.type === 'UnaryMinus') {
+    return {
+      result: intValue(-rightResult.value),
+      environemt: rightEnvironment,
+    }
+  }
+  return {
+    result: intValue(rightResult.value),
     environment: rightEnvironment,
   }
 }
@@ -105,7 +148,11 @@ function evaluate(ast, environment) {
     case 'If':
       return evaluateIfStatement(ast, environment)
     case 'Add':
-      return evaluateAdd(ast, environment)
+    case 'Sub':
+      return evaluateAddSub(ast, environment)
+    case 'UnaryPlus':
+    case 'UnaryMinus':
+      return evaluateUnaryOperator(ast, environment)
     case 'Variable':
       return {
         result: environment.variables.get(ast.name) || nullValue,

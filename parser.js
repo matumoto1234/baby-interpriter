@@ -109,17 +109,58 @@ function parseFunctionCallExpression(tokens) {
   }
 }
 
-function parseAddSubExpression(tokens) {
-  let { expression: left, parsedTokensCount: readPosition } = parseFunctionCallExpression(tokens)
-  while (tokens[readPosition]?.type === 'Plus') {
+function parseUnaryOperatorExpression(tokens) {
+  if (tokens[0]?.type !== 'Plus' && tokens[0]?.type !== 'Minus') {
+    return parseFunctionCallExpression(tokens)
+  }
+
+  const result = parseUnaryOperatorExpression(tokens.slice(1))
+  return {
+    expression: {
+      type: tokens[0]?.type === 'Plus' ? 'UnaryPlus' : 'UnaryMinus',
+      right: result.expression,
+    },
+    parsedTokensCount: result.parsedTokensCount + 1,
+  }
+}
+
+function parseMulDivExpression(tokens) {
+  let { expression: left, parsedTokensCount: readPosition } = parseUnaryOperatorExpression(tokens)
+
+  while (tokens[readPosition]?.type === 'Mul' || tokens[readPosition]?.type === 'Div') {
     const {
       expression: right,
       parsedTokensCount: rightTokensCount,
-    } = parseFunctionCallExpression(tokens.slice(readPosition + 1))
+    } = parseUnaryOperatorExpression(tokens.slice(readPosition + 1))
+
     if (right === null) {
       return { expression: null }
     }
+
     left = { type: 'Add', left, right }
+    readPosition += rightTokensCount + 1
+  }
+  return { expression: left, parsedTokensCount: readPosition }
+}
+
+function parseAddSubExpression(tokens) {
+  let { expression: left, parsedTokensCount: readPosition } = parseUnaryOperatorExpression(tokens)
+
+  while (tokens[readPosition]?.type === 'Plus' || tokens[readPosition]?.type === 'Minus') {
+    const {
+      expression: right,
+      parsedTokensCount: rightTokensCount,
+    } = parseMulDivExpression(tokens.slice(readPosition + 1))
+
+    if (right === null) {
+      return { expression: null }
+    }
+
+    if (tokens[readPosition]?.type === 'Plus') {
+      left = { type: 'Add', left, right }
+    } else {
+      left = { type: 'Sub', left, right }
+    }
     readPosition += rightTokensCount + 1
   }
   return { expression: left, parsedTokensCount: readPosition }
