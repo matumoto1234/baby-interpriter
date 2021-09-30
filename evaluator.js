@@ -41,7 +41,7 @@ function evaluateStatements(statements, environment) {
 }
 
 function evaluateIfStatement(ast, initialEnvironment) {
-  const { condition, statements } = ast
+  const { condition, statements, elseStatement: elseStatements } = ast
   // eslint-disable-next-line no-use-before-define
   const evalResult = evaluate(condition, initialEnvironment)
   if (evalResult === null) {
@@ -49,10 +49,14 @@ function evaluateIfStatement(ast, initialEnvironment) {
   }
   const { result, environment: halfwayEnvironment } = evalResult
   if ((result.type === 'BoolValue' && result.value === false) || result.type === 'NullValue') {
-    return {
-      result: nullValue,
-      environment: halfwayEnvironment,
+    if (!elseStatements) {
+      return {
+        result: nullValue,
+        environment: halfwayEnvironment,
+      }
     }
+
+    return evaluateStatements(elseStatements.statements, halfwayEnvironment)
   }
   // eslint-disable-next-line no-use-before-define
   return evaluateStatements(statements, halfwayEnvironment)

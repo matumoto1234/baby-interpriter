@@ -175,16 +175,16 @@ function parseBlock(tokens) {
     return { statements: null }
   }
   const statements = []
-  let readPosition = 1
-  while (tokens[readPosition]?.type !== 'RBrace') {
-    if (tokens[readPosition] === undefined) {
+  let readPosition = 0
+  while (tokens[readPosition + 1]?.type !== 'RBrace') {
+    if (tokens[readPosition + 1] === undefined) {
       return { statements: null }
     }
     const {
       statement: stmt,
       parsedTokensCount,
     // eslint-disable-next-line no-use-before-define
-    } = parseStatement(tokens.slice(readPosition))
+    } = parseStatement(tokens.slice(readPosition + 1))
     if (stmt === null) {
       return { statements: null }
     }
@@ -194,6 +194,27 @@ function parseBlock(tokens) {
   return {
     statements,
     parsedTokensCount: readPosition + 2,
+  }
+}
+
+function parseElseStatement(tokens) {
+  if (tokens[0]?.type !== 'Else' || tokens[1]?.type !== 'LBrace') {
+    return { elseStatement: null }
+  }
+  const {
+    statements,
+    parsedTokensCount: parsedBlockTokensCount,
+  } = parseBlock(tokens.slice(1))
+
+  if (!statements) {
+    return { elseStatement: null }
+  }
+  return {
+    elseStatement: {
+      type: 'Else',
+      statements,
+    },
+    parsedTokensCount: parsedBlockTokensCount + 3,
   }
 }
 
@@ -217,13 +238,27 @@ function parseIfStatement(tokens) {
   if (!statements) {
     return { ifStatement: null }
   }
+
+  // +3 'If', 'LParen' and 'RParen' and `index` is 0-indexed
+  const endIfIndex = parsedExpressionTokensCount + parsedBlockTokensCount + 3 - 1
+  let elseStatement
+  let parsedElseTokensCount = 0
+
+  if (tokens[endIfIndex + 1]?.type === 'Else') {
+    const elseResult = parseElseStatement(tokens.slice(endIfIndex + 1))
+
+    elseStatement = elseResult.elseStatement
+    parsedElseTokensCount = elseResult.parsedTokensCount
+  }
+
   return {
     ifStatement: {
       type: 'If',
       condition,
       statements,
+      elseStatement,
     },
-    parsedTokensCount: parsedExpressionTokensCount + parsedBlockTokensCount + 3,
+    parsedTokensCount: endIfIndex + parsedElseTokensCount,
   }
 }
 
@@ -322,7 +357,7 @@ function parseDefineFunction(tokens) {
       arguments: args,
       statements,
     },
-    parsedTokensCount: parsedArgumentTokensCount + parsedBlockTokensCount + 4,
+    parsedTokensCount: parsedArgumentTokensCount + parsedBlockTokensCount + 3,
   }
 }
 
