@@ -37,7 +37,7 @@ function parseValue(tokens) {
     return {
       expression: {
         type: 'Variable',
-        name: head.value,
+        name: head.name,
       },
       parsedTokensCount: 1,
     }
@@ -86,7 +86,7 @@ function parseCommaSeparatedExpressions(tokens) {
   }
 }
 
-function parseFunctionCallExpression(tokens) {
+function parseFunctionCallingExpression(tokens) {
   const name = tokens[0]
   if (name?.type !== 'Ident' || tokens[1]?.type !== 'LParen') {
     return parseParenthesisExpression(tokens)
@@ -102,37 +102,20 @@ function parseFunctionCallExpression(tokens) {
   return {
     expression: {
       type: 'FuncCall',
-      name: name.value,
+      name: name.name,
       arguments: args,
     },
     parsedTokensCount: parsedTokensCount + 3,
   }
 }
 
-function parseUnaryOperatorExpression(tokens) {
-  if (tokens[0]?.type !== 'Plus' && tokens[0]?.type !== 'Minus') {
-    return parseFunctionCallExpression(tokens)
-  }
-
-  const result = parseUnaryOperatorExpression(tokens.slice(1))
-  return {
-    expression: {
-      type: tokens[0]?.type === 'Plus' ? 'UnaryPlus' : 'UnaryMinus',
-      right: result.expression,
-    },
-    parsedTokensCount: result.parsedTokensCount + 1,
-  }
-}
-
-function parseMulDivExpression(tokens) {
-  let { expression: left, parsedTokensCount: readPosition } = parseUnaryOperatorExpression(tokens)
-
-  while (tokens[readPosition]?.type === 'Mul' || tokens[readPosition]?.type === 'Div') {
+function parseAddSubExpression(tokens) {
+  let { expression: left, parsedTokensCount: readPosition } = parseFunctionCallingExpression(tokens)
+  while (tokens[readPosition]?.type === 'Plus') {
     const {
       expression: right,
       parsedTokensCount: rightTokensCount,
-    } = parseUnaryOperatorExpression(tokens.slice(readPosition + 1))
-
+    } = parseFunctionCallingExpression(tokens.slice(readPosition + 1))
     if (right === null) {
       return { expression: null }
     }
@@ -143,28 +126,28 @@ function parseMulDivExpression(tokens) {
   return { expression: left, parsedTokensCount: readPosition }
 }
 
-function parseAddSubExpression(tokens) {
-  let { expression: left, parsedTokensCount: readPosition } = parseUnaryOperatorExpression(tokens)
+// function parseAddSubExpression(tokens) {
+//   let { expression: left, parsedTokensCount: readPosition } = parseUnaryOperatorExpression(tokens)
 
-  while (tokens[readPosition]?.type === 'Plus' || tokens[readPosition]?.type === 'Minus') {
-    const {
-      expression: right,
-      parsedTokensCount: rightTokensCount,
-    } = parseMulDivExpression(tokens.slice(readPosition + 1))
+//   while (tokens[readPosition]?.type === 'Plus' || tokens[readPosition]?.type === 'Minus') {
+//     const {
+//       expression: right,
+//       parsedTokensCount: rightTokensCount,
+//     } = parseMulDivExpression(tokens.slice(readPosition + 1))
 
-    if (right === null) {
-      return { expression: null }
-    }
+//     if (right === null) {
+//       return { expression: null }
+//     }
 
-    if (tokens[readPosition]?.type === 'Plus') {
-      left = { type: 'Add', left, right }
-    } else {
-      left = { type: 'Sub', left, right }
-    }
-    readPosition += rightTokensCount + 1
-  }
-  return { expression: left, parsedTokensCount: readPosition }
-}
+//     if (tokens[readPosition]?.type === 'Plus') {
+//       left = { type: 'Add', left, right }
+//     } else {
+//       left = { type: 'Sub', left, right }
+//     }
+//     readPosition += rightTokensCount + 1
+//   }
+//   return { expression: left, parsedTokensCount: readPosition }
+// }
 
 function parseExpression(tokens) {
   return parseAddSubExpression(tokens)
@@ -193,7 +176,7 @@ function parseBlock(tokens) {
   }
   return {
     statements,
-    parsedTokensCount: readPosition + 2,
+    parsedTokensCount: readPosition + 1,
   }
 }
 
@@ -273,7 +256,7 @@ function parseAssignment(tokens) {
   return {
     assignment: {
       type: 'Assignment',
-      name: tokens[0].value,
+      name: tokens[0].name,
       expression,
     },
     parsedTokensCount: parsedTokensCount + 2,
@@ -313,7 +296,7 @@ function parseCommaSeparatedIdentfiers(tokens) {
       parsedTokensCount: 0,
     }
   }
-  const names = [head.value]
+  const names = [head.name]
   let readPosition = 1
   while (tokens[readPosition]?.type === 'Comma') {
     readPosition += 1
@@ -322,7 +305,7 @@ function parseCommaSeparatedIdentfiers(tokens) {
     if (next.type !== 'Ident') {
       break
     }
-    names.push(next.value)
+    names.push(next.name)
     readPosition += 1
   }
   return {
@@ -331,11 +314,11 @@ function parseCommaSeparatedIdentfiers(tokens) {
   }
 }
 
-function parseDefineFunction(tokens) {
+function parseFunctionDefinition(tokens) {
   if (tokens[0]?.type !== 'Def' || tokens[1]?.type !== 'Ident' || tokens[2]?.type !== 'LParen') {
     return { define: null }
   }
-  const { value: name } = tokens[1]
+  const { name } = tokens[1]
   const {
     names: args,
     parsedTokensCount: parsedArgumentTokensCount,
@@ -378,7 +361,7 @@ function parseSource(tokens) {
     const {
       defineFunction,
       parsedTokensCount: parsedDefineFunctionTokensCount,
-    } = parseDefineFunction(tokens.slice(readPosition))
+    } = parseFunctionDefinition(tokens.slice(readPosition))
     if (defineFunction) {
       statements.push(defineFunction)
       readPosition += parsedDefineFunctionTokensCount
@@ -387,7 +370,7 @@ function parseSource(tokens) {
     }
     return {
       type: 'SyntaxError',
-      message: `予期しないトークン\`${tokens[readPosition]?.type}\`が渡されました`,
+      message: `予期しないトークン'${tokens[readPosition]?.type}'が渡されました`,
       headToken: tokens[readPosition],
     }
   }

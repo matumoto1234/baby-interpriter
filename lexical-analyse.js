@@ -204,7 +204,7 @@ module.exports.lexicalAnalyse = function (source) {
             default:
               tokens.push({
                 type: 'Ident',
-                value: name,
+                name,
               })
           }
           readPosition += identCharsCount
