@@ -31,6 +31,7 @@ async function read() {
       console.error(ast)
       continue
     }
+    console.log(ast);
     const resultObject = evaluate(ast, environment)
     if (resultObject.result.isError) {
       console.error(resultObject)

@@ -47,6 +47,8 @@ function evaluateIfStatement(ast, initialEnvironment) {
   if (evalResult === null) {
     return evaluaterError(condition, initialEnvironment)
   }
+  console.log('condition:', condition)
+  console.log('evalResult:', evalResult)
   const { result, environment: halfwayEnvironment } = evalResult
   if ((result.type === 'BoolValue' && result.value === false) || result.type === 'NullValue') {
     if (!elseStatements) {
@@ -63,6 +65,7 @@ function evaluateIfStatement(ast, initialEnvironment) {
 }
 
 function evaluateAddSub(ast, environment) {
+  console.log(ast)
   const {
     result: leftResult,
     environment: leftEnvironment,
