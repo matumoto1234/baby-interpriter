@@ -60,7 +60,7 @@ function parseCommaSeparatedExpressions(tokens) {
   const {
     expression: firstExpression,
     parsedTokensCount: firstParsedTokensCount,
-  // eslint-disable-next-line no-use-before-define
+    // eslint-disable-next-line no-use-before-define
   } = parseExpression(tokens)
   if (firstExpression === null) {
     return {
@@ -126,29 +126,6 @@ function parseAddSubExpression(tokens) {
   return { expression: left, parsedTokensCount: readPosition }
 }
 
-// function parseAddSubExpression(tokens) {
-//   let { expression: left, parsedTokensCount: readPosition } = parseUnaryOperatorExpression(tokens)
-
-//   while (tokens[readPosition]?.type === 'Plus' || tokens[readPosition]?.type === 'Minus') {
-//     const {
-//       expression: right,
-//       parsedTokensCount: rightTokensCount,
-//     } = parseMulDivExpression(tokens.slice(readPosition + 1))
-
-//     if (right === null) {
-//       return { expression: null }
-//     }
-
-//     if (tokens[readPosition]?.type === 'Plus') {
-//       left = { type: 'Add', left, right }
-//     } else {
-//       left = { type: 'Sub', left, right }
-//     }
-//     readPosition += rightTokensCount + 1
-//   }
-//   return { expression: left, parsedTokensCount: readPosition }
-// }
-
 function parseExpression(tokens) {
   return parseAddSubExpression(tokens)
 }
@@ -158,16 +135,16 @@ function parseBlock(tokens) {
     return { statements: null }
   }
   const statements = []
-  let readPosition = 0
-  while (tokens[readPosition + 1]?.type !== 'RBrace') {
-    if (tokens[readPosition + 1] === undefined) {
+  let readPosition = 1
+  while (tokens[readPosition]?.type !== 'RBrace') {
+    if (tokens[readPosition] === undefined) {
       return { statements: null }
     }
     const {
       statement: stmt,
       parsedTokensCount,
-    // eslint-disable-next-line no-use-before-define
-    } = parseStatement(tokens.slice(readPosition + 1))
+      // eslint-disable-next-line no-use-before-define
+    } = parseStatement(tokens.slice(readPosition))
     if (stmt === null) {
       return { statements: null }
     }
@@ -222,16 +199,24 @@ function parseIfStatement(tokens) {
     return { ifStatement: null }
   }
 
-  // +3 'If', 'LParen' and 'RParen' and `index` is 0-indexed
-  const endIfIndex = parsedExpressionTokensCount + parsedBlockTokensCount + 3 - 1
-  let elseStatement
-  let parsedElseTokensCount = 0
+  // +3 'If', 'LParen' and 'RParen'
+  const elseReadPosition = parsedExpressionTokensCount + parsedBlockTokensCount + 3
 
-  if (tokens[endIfIndex + 1]?.type === 'Else') {
-    const elseResult = parseElseStatement(tokens.slice(endIfIndex + 1))
+  if (tokens[elseReadPosition]?.type === 'Else') {
+    const {
+      elseStatement,
+      parsedTokensCount: parsedElseTokensCount,
+    } = parseElseStatement(tokens.slice(elseReadPosition))
 
-    elseStatement = elseResult.elseStatement
-    parsedElseTokensCount = elseResult.parsedTokensCount
+    return {
+      ifStatement: {
+        type: 'If',
+        condition,
+        statements,
+        elseStatement,
+      },
+      parsedTokensCount: elseReadPosition + parsedElseTokensCount,
+    }
   }
 
   return {
@@ -239,9 +224,8 @@ function parseIfStatement(tokens) {
       type: 'If',
       condition,
       statements,
-      elseStatement,
     },
-    parsedTokensCount: endIfIndex + parsedElseTokensCount,
+    parsedTokensCount: elseReadPosition,
   }
 }
 
@@ -340,7 +324,7 @@ function parseFunctionDefinition(tokens) {
       arguments: args,
       statements,
     },
-    parsedTokensCount: parsedArgumentTokensCount + parsedBlockTokensCount + 3,
+    parsedTokensCount: parsedArgumentTokensCount + parsedBlockTokensCount + 4,
   }
 }
 

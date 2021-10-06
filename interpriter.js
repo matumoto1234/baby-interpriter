@@ -16,8 +16,20 @@ async function read() {
 }
 
 (async () => {
+  // let environment = []
+  // environment.push({
+  //   variables: new Map(),
+  //   functions: new Map([
+  //     ['print', {
+  //       type: 'EmbededFunction',
+  //       argumentsCount: 1,
+  //       function: console.log,
+  //     }],
+  //   ]),
+  // })
   let environment = {
-    variables: new Map(),
+    // variables は Map の配列
+    variables: [new Map()],
     functions: new Map([
       ['print', {
         type: 'EmbededFunction',
@@ -39,7 +51,7 @@ async function read() {
       console.error(ast)
       continue
     }
-    console.log(ast);
+    console.log(ast)
     const resultObject = evaluate(ast, environment)
     if (resultObject.result.isError) {
       console.error(resultObject)

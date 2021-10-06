@@ -1,5 +1,16 @@
 const { intValue, nullValue, boolValue } = require('./value')
 
+function getVariable(environment, name) {
+  // eslint-disable-next-line no-restricted-syntax
+  for (const vars of environment.variables) {
+    const res = vars.get(name)
+    if (res) {
+      return res
+    }
+  }
+  return undefined
+}
+
 function evaluaterError(ast, environment) {
   return {
     result: {
@@ -51,6 +62,9 @@ function evaluateIfStatement(ast, initialEnvironment) {
       environment: halfwayEnvironment,
     }
   }
+  // console.log('halfwayEnvironment:', halfwayEnvironment)
+  // console.log('type:', typeof halfwayEnvironment)
+  halfwayEnvironment.variables.push(new Map())
   if ((result.type === 'BoolValue' && result.value === false) || result.type === 'NullValue') {
     if (!elseStatements) {
       return {
@@ -58,15 +72,16 @@ function evaluateIfStatement(ast, initialEnvironment) {
         environment: halfwayEnvironment,
       }
     }
-
-    return evaluateStatements(elseStatements.statements, halfwayEnvironment)
+    const res = evaluateStatements(elseStatements.statements, halfwayEnvironment)
+    res.environment.variables = res.environment.variables.slice(0, -1)
+    return res
   }
-  // eslint-disable-next-line no-use-before-define
-  return evaluateStatements(statements, halfwayEnvironment)
+  const res = evaluateStatements(statements, halfwayEnvironment)
+  res.environment.variables = res.environment.variables.slice(0, -1)
+  return res
 }
 
 function evaluateAddSub(ast, environment) {
-  console.log(ast)
   const {
     result: leftResult,
     environment: leftEnvironment,
@@ -191,6 +206,7 @@ function evaluateFunctionCalling(calling, environment) {
       result: argResult, environment: argEnvironment,
     // eslint-disable-next-line no-use-before-define
     } = evaluate(stmt, argumentsEvaluatedEnvironment)
+
     if (argResult.isError) {
       return {
         result: argResult,
@@ -206,10 +222,10 @@ function evaluateFunctionCalling(calling, environment) {
         return wrapObject(func.function(...evaluatedArguments.map(unwrapObject)))
       case 'DefinedFunction':
         return evaluateStatements(func.statements, {
-          variables: new Map(
+          variables: [new Map(
             [...Array(func.argumentsCount).keys()]
               .map((i) => [func.arguments[i], evaluatedArguments[i]]),
-          ),
+          )],
           functions: argumentsEvaluatedEnvironment.functions,
         }).result
       default:
@@ -251,16 +267,24 @@ function evaluate(ast, environment) {
     case 'FuncDef':
       return evaluateFunctionDefinition(ast, environment)
     case 'Assignment':
+      environment.variables[environment.variables.length - 1].set(
+        ast.name,
+        evaluate(ast.expression, environment).result,
+      )
       return {
         result: nullValue,
-        environment: {
-          variables: new Map(environment.variables).set(
-            ast.name,
-            evaluate(ast.expression, environment).result,
-          ),
-          functions: environment.functions,
-        },
+        environment,
       }
+      // return {
+      //   result: nullValue,
+      //   environment: {
+      //     variables: new Map(environment.variables).set(
+      //       ast.name,
+      //       evaluate(ast.expression, environment).result,
+      //     ),
+      //     functions: environment.functions,
+      //   },
+      // }
     case 'If':
       return evaluateIfStatement(ast, environment)
     case 'Add':
@@ -271,7 +295,7 @@ function evaluate(ast, environment) {
       return evaluateUnaryOperator(ast, environment)
     case 'Variable':
       return {
-        result: environment.variables.get(ast.name) || nullValue,
+        result: getVariable(environment, ast.name) || nullValue,
         environment,
       }
     case 'FuncCall':

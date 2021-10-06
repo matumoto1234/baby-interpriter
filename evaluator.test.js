@@ -722,6 +722,6 @@ describe('評価', () => {
         }],
       ]),
     }
-    expect(evaluate(lexAndParse('def fib(n) { if(gt(1, n)){ ret = fib(sub(n, 1)) + fib(sub(n, 2)); } or(ret, n); } fib(20);'), environment).result).toStrictEqual(intValue(6765))
+    expect(evaluate(lexAndParse('def fib(n) { if(gt(1, n)){ ret = fib(sub(n, 1)) + fib(sub(n, 2)); } or(ret, n); } fib(5);'), environment).result).toStrictEqual(intValue(5))
   })
 })
